@@ -37,9 +37,8 @@ class MlpExtractor(nn.Module):
 
 
 class MLPPolicy(ActorCriticPolicy):
-    def __init__(self, net_arch, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(MLPPolicy, self).__init__(*args, **kwargs)
-        self.net_arch = net_arch
     
     def _build_mlp_extractor(self) -> None:
         return MlpExtractor(
