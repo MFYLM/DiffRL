@@ -1,4 +1,5 @@
 from typing import *
+from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
@@ -31,7 +32,12 @@ class FlowDiffusionGym(gym.Env):
         if dataset not in {"MNIST", "CIFAR10", "smily_face"}:
             raise Exception("OOF, INVALID DATASET")
         elif dataset == "smiley_face":
-            self.dataset = SmileyFaceDataset(transform=transform)
+            data_file = Path("./data/smiley_dataset.pkl")
+            if data_file.exists():
+                self.dataset = SmileyFaceDataset(data_path=str(data_file.resolve()))
+            else:
+                self.dataset = SmileyFaceDataset(transform=transform)
+                self.dataset.save(str(data_file.resolve()))
         else:
             self.dataset = eval(
                 f"torchvision.datasets.{dataset}(root='./data/', transform=transform)")
@@ -100,7 +106,7 @@ class FlowDiffusionGym(gym.Env):
         return torch.norm(true_direction - action)
 
     def _is_terminated(self):
-        return torch.norm(self.cur_state - self.dataset[self.img_idxs]) ** 2 < 0.01
+        return torch.norm(self.cur_state - self.dataset[self.img_idxs]) < 0.01
 
     def _is_truncated(self):
         return self.time >= self.max_time_step

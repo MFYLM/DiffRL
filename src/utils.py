@@ -1,18 +1,30 @@
-import math
+import pickle
 
 import numpy as np
 import torch
+from torchvision.transforms.v2 import Transform
 
 
 class SmileyFaceDataset(torch.utils.data.Dataset):
-    def __init__(self, size: int = 100, transform=None):
-        self.data = [generate_happy_face(num_samples=1000)
-                     for i in range(size)]
-        for _ in range(size):
-            img = generate_happy_face(num_samples=1000)
-            if transform:
-                img = transform(img)
-            self.data.append(img)
+    def __init__(self, size: int = 100, transform: Transform=None, data_path: str=None):
+        if data_path:
+            self.load(data_path)
+        else:
+            self.data = [generate_happy_face(num_samples=1000)
+                        for i in range(size)]
+            for _ in range(size):
+                img = generate_happy_face(num_samples=1000)
+                if transform:
+                    img = transform(img)
+                self.data.append(img)
+    
+    def load(self, data_path):
+        with open(data_path, "rb") as f:
+            self.data = pickle.load(f)
+
+    def save(self, data_path):
+        with open(data_path, "wb") as f:
+            pickle.dump(self.data, data_path)
 
     def __getitem__(self, index):
         return self.data[index]
@@ -135,6 +147,3 @@ def generate_path_data(original_imgs: torch.Tensor, target_imgs: torch.Tensor) -
         torch.Tensor: _description_
     """
     pass
-
-
-
