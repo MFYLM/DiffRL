@@ -52,7 +52,7 @@ class ResNetBlock(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, net_arch=[128, 128, 128], emb_size: int = 128):
+    def __init__(self, net_arch=[128, 128, 128], output_size: int=2, emb_size: int = 128):
         super().__init__()
 
         self.time_mlp = PositionalEmbedding(emb_size)
@@ -71,7 +71,7 @@ class MLP(nn.Module):
             layers.append(ResNetBlock(net_arch[i]))
 
         # Output layer, project back to original data dimension
-        layers.append(nn.Linear(net_arch[-1], 2))
+        layers.append(nn.Linear(net_arch[-1], output_size))
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x, t):
