@@ -10,13 +10,12 @@ from gymnasium import spaces
 from gymnasium.utils import seeding
 from torchvision.datasets import CIFAR10, MNIST
 from torchvision.transforms import v2
-from utils import SmileyFaceDataset
+from utils import SmileyFaceDataset, MLP
 
 from flow_matching import EmpiricalFlowMatching
-from nn_utils import MLP
 
 
-class FlowDiffusionGym(gym.Env):
+class FlowDiffusionEnv(gym.Env):
     def __init__(
         self,
         dataset: str,
@@ -27,9 +26,9 @@ class FlowDiffusionGym(gym.Env):
         max_time_step: int,
         batch_size=256
     ) -> None:
-        super(FlowDiffusionGym, self).__init__()
+        super(FlowDiffusionEnv, self).__init__()
         transform = v2.Compose([v2.ToTensor()])
-        if dataset not in {"MNIST", "CIFAR10", "smily_face"}:
+        if dataset not in {"MNIST", "CIFAR10", "smiley_face"}:
             raise Exception("OOF, INVALID DATASET")
         elif dataset == "smiley_face":
             data_file = Path("./data/smiley_dataset.pkl")

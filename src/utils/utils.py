@@ -10,10 +10,9 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
         if data_path:
             self.load(data_path)
         else:
-            self.data = [generate_happy_face(num_samples=1000)
-                        for i in range(size)]
+            self.data = []
             for _ in range(size):
-                img = generate_happy_face(num_samples=1000)
+                img = generate_happy_face(num_samples=512)
                 if transform:
                     img = transform(img)
                 self.data.append(img)

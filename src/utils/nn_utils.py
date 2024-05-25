@@ -52,19 +52,26 @@ class ResNetBlock(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, hidden_size: int = 128, hidden_layers: int = 3, emb_size: int = 128):
+    def __init__(self, net_arch=[128, 128, 128], emb_size: int = 128):
         super().__init__()
 
         self.time_mlp = PositionalEmbedding(emb_size)
         self.input_mlp1 = PositionalEmbedding(emb_size, scale=25.0)
         self.input_mlp2 = PositionalEmbedding(emb_size, scale=25.0)
 
+        # size of embeddings with input data
         concat_size = len(self.time_mlp.layer) + \
             len(self.input_mlp1.layer) + len(self.input_mlp2.layer)
-        layers = [nn.Linear(concat_size, hidden_size), nn.GELU()]
-        for _ in range(hidden_layers):
-            layers.append(ResNetBlock(hidden_size))
-        layers.append(nn.Linear(hidden_size, 2))
+        
+        # First layer of neurons
+        layers = [nn.Linear(concat_size, net_arch[0]), nn.GELU()]
+
+        # Hidden Layers
+        for i in range(1, len(net_arch)):
+            layers.append(ResNetBlock(net_arch[i]))
+
+        # Output layer, project back to original data dimension
+        layers.append(nn.Linear(net_arch[-1], 2))
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x, t):
