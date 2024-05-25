@@ -1,4 +1,4 @@
 torch
 torchvision
-stable_baseline3
+stable-baselines3[extra]
 gymnasium
