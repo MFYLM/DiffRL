@@ -7,7 +7,7 @@ from torchvision.transforms.v2 import Transform
 
 class SmileyFaceDataset(torch.utils.data.Dataset):
     def __init__(self, size: int = 100, transform: Transform=None, data_path: str=None):
-        if data_path:
+        if data_path is not None:
             self.load(data_path)
         else:
             self.data = []
@@ -23,9 +23,10 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
 
     def save(self, data_path):
         with open(data_path, "wb") as f:
-            pickle.dump(self.data, data_path)
+            pickle.dump(self.data, f)
 
     def __getitem__(self, index):
+        print(f"one datapoint: {self.data[index]}")
         return self.data[index]
 
 

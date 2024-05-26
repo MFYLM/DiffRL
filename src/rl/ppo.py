@@ -12,8 +12,9 @@ from stable_baselines3.common.policies import ActorCriticCnnPolicy, ActorCriticP
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import explained_variance, get_schedule_fn
 
-SelfPPO = TypeVar("SelfPPO", bound="PPO")
+from .policy import MLPPolicy
 
+SelfPPO = TypeVar("SelfPPO", bound="PPO")
 
 class PPO(OnPolicyAlgorithm):
     """
@@ -72,7 +73,7 @@ class PPO(OnPolicyAlgorithm):
     """
 
     policy_aliases: ClassVar[Dict[str, Type[BasePolicy]]] = {
-        "MlpPolicy": ActorCriticPolicy,
+        "MlpPolicy": MLPPolicy,
         "CnnPolicy": ActorCriticCnnPolicy,
         "MultiInputPolicy": MultiInputActorCriticPolicy,
     }

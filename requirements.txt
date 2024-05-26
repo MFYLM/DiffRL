@@ -3,3 +3,4 @@ torchvision
 stable-baselines3[extra]
 gymnasium
 scipy
+pytorch-fid

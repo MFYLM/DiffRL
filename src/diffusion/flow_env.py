@@ -6,20 +6,22 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.utils as utils
+from torch.utils.data import Subset
 from gymnasium import spaces
 from gymnasium.utils import seeding
 from torchvision.datasets import CIFAR10, MNIST
 from torchvision.transforms import v2
 from utils import SmileyFaceDataset, MLP
 
-from flow_matching import EmpiricalFlowMatching
+from .flow_matching import EmpiricalFlowMatching
 
 
 class FlowDiffusionEnv(gym.Env):
     def __init__(
         self,
         dataset: str,
-        obs_horizon: Tuple[float],
+        obs_range: Tuple[float],
+        obs_horizon: int,
         obs_shape: Tuple[float],
         action_range: Tuple[float],
         action_shape: Tuple[float],
@@ -27,7 +29,7 @@ class FlowDiffusionEnv(gym.Env):
         batch_size=256
     ) -> None:
         super(FlowDiffusionEnv, self).__init__()
-        transform = v2.Compose([v2.ToTensor()])
+        transform = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
         if dataset not in {"MNIST", "CIFAR10", "smiley_face"}:
             raise Exception("OOF, INVALID DATASET")
         elif dataset == "smiley_face":
@@ -35,19 +37,22 @@ class FlowDiffusionEnv(gym.Env):
             if data_file.exists():
                 self.dataset = SmileyFaceDataset(data_path=str(data_file.resolve()))
             else:
-                self.dataset = SmileyFaceDataset(transform=transform)
+                self.dataset = SmileyFaceDataset(transform=transform, data_path=None)
                 self.dataset.save(str(data_file.resolve()))
         else:
             self.dataset = eval(
-                f"torchvision.datasets.{dataset}(root='./data/', transform=transform)")
-        self.observation_space = spaces.Box(*obs_horizon, obs_shape)
+                f"{dataset}(root='./data/', transform=transform, download=True)")
+        self.observation_space = gym.spaces.Dict({
+            "obs": spaces.Box(*obs_range, obs_shape),
+            "time": spaces.Discrete(max_time_step)
+        })
         self.action_space = spaces.Box(*action_range, action_shape)
         self.batch_size = batch_size
         self.time = 0
         self.max_time_step = max_time_step
 
         # current images
-        self.cur_state = None
+        self.cur_state = torch.randn(*action_shape)
         # all images in the sampled trajectory
         self.states = []
         # action log probabilities for the sampled trajectory
@@ -65,7 +70,7 @@ class FlowDiffusionEnv(gym.Env):
         return [seed]
 
     @torch.no_grad()
-    def step(self, action: torch.Tensor, value_net: nn.Module):
+    def step(self, action: torch.Tensor):
         """
         Args:
             action [torch.Tensor]: same dimension with image space, predict the movement of the image
@@ -73,7 +78,6 @@ class FlowDiffusionEnv(gym.Env):
         """
         is_terminated = False
         is_truncated = False
-        info = dict()
 
         is_terminated = self._is_terminated()
         is_truncated = self._is_truncated()
@@ -81,16 +85,18 @@ class FlowDiffusionEnv(gym.Env):
         # TODO: fix updating current state and maintaining states 
         self.cur_state = self.cur_state + action
         self.states.append(self.cur_state)
-        self.time += 1
         reward = self._calculate_reward(action)
+        self.time += 1
 
-        return self.cur_state, reward, is_terminated, is_truncated, info
+        return {"obs":self.cur_state, "time": self.time}, reward, is_terminated, is_truncated, {}
 
     def reset(self, seed=None, options=None):
-        self.img_idxs = torch.randperm(self.dataset.shape[0])[:self.batch_size]
-        self.states = self.dataset[self.img_idxs]
+        self.img_idxs = torch.randperm(len(self.dataset))[:self.batch_size]
+        subset = Subset(self.dataset, self.img_idxs)
+        self.orig = self.cur_state = torch.stack([img for img, _ in subset])
+        self.states = [self.cur_state]
         self.time = 0
-        return self.states, dict()
+        return {"obs":self.cur_state, "time": self.time}, {}
 
     def render(self, *args, **kwargs):
         pass
@@ -105,7 +111,7 @@ class FlowDiffusionEnv(gym.Env):
         return torch.norm(true_direction - action)
 
     def _is_terminated(self):
-        return torch.norm(self.cur_state - self.dataset[self.img_idxs]) < 0.01
+        return torch.norm(self.cur_state - self.orig) < 0.01
 
     def _is_truncated(self):
         return self.time >= self.max_time_step

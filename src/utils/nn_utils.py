@@ -74,7 +74,8 @@ class MLP(nn.Module):
         layers.append(nn.Linear(net_arch[-1], output_size))
         self.joint_mlp = nn.Sequential(*layers)
 
-    def forward(self, x, t):
+    def forward(self, x):
+        x,t = x["obs"], x['time']
         x1_emb = self.input_mlp1(x[:, 0])
         x2_emb = self.input_mlp2(x[:, 1])
         t_emb = self.time_mlp(t)
