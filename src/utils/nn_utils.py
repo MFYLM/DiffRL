@@ -52,12 +52,12 @@ class ResNetBlock(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, net_arch=[128, 128, 128], output_size: int=2, emb_size: int = 128):
+    def __init__(self, net_arch=[128, 128, 128], output_size: int=128, emb_size: int = 128): # output_size was default 2
         super().__init__()
 
-        self.time_mlp = PositionalEmbedding(emb_size)
-        self.input_mlp1 = PositionalEmbedding(emb_size, scale=25.0)
-        self.input_mlp2 = PositionalEmbedding(emb_size, scale=25.0)
+        self.time_mlp = PositionalEmbedding(emb_size - 1)
+        self.input_mlp1 = PositionalEmbedding(emb_size - 1, scale=25.0)
+        self.input_mlp2 = PositionalEmbedding(emb_size - 1, scale=25.0)
 
         # size of embeddings with input data
         concat_size = len(self.time_mlp.layer) + \
@@ -75,11 +75,12 @@ class MLP(nn.Module):
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x):
-        x,t = x["obs"], x['time']
+        x,t = x[:, :-1], x[:, -1]
         x1_emb = self.input_mlp1(x[:, 0])
         x2_emb = self.input_mlp2(x[:, 1])
         t_emb = self.time_mlp(t)
-
         x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
+        if x.size(0) == 1:
+            x = x.flatten()
         x = self.joint_mlp(x)
         return x

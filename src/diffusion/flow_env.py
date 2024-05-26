@@ -21,12 +21,12 @@ class FlowDiffusionEnv(gym.Env):
         self,
         dataset: str,
         obs_range: Tuple[float],
-        obs_horizon: int,
+        # obs_horizon: int,
         obs_shape: Tuple[float],
         action_range: Tuple[float],
         action_shape: Tuple[float],
         max_time_step: int,
-        batch_size=256
+        # batch_size=256
     ) -> None:
         super(FlowDiffusionEnv, self).__init__()
         transform = v2.Compose([v2.ToImage(), v2.ToDtype(torch.float32, scale=True)])
@@ -44,10 +44,10 @@ class FlowDiffusionEnv(gym.Env):
                 f"{dataset}(root='./data/', transform=transform, download=True)")
         self.observation_space = gym.spaces.Dict({
             "obs": spaces.Box(*obs_range, obs_shape),
-            "time": spaces.Discrete(max_time_step)
+            "time": spaces.Box(0, max_time_step, (1, ), int)
         })
         self.action_space = spaces.Box(*action_range, action_shape)
-        self.batch_size = batch_size
+        # self.batch_size = batch_size
         self.time = 0
         self.max_time_step = max_time_step
 
@@ -64,6 +64,9 @@ class FlowDiffusionEnv(gym.Env):
         self.is_terminated = []
 
         self.img_idxs = []
+
+        loc = torch.zeros(*action_shape).flatten()
+        self.init_dist = torch.distributions.multivariate_normal.MultivariateNormal(loc, torch.eye(loc.shape[0], loc.shape[0]))
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -91,11 +94,14 @@ class FlowDiffusionEnv(gym.Env):
         return {"obs":self.cur_state, "time": self.time}, reward, is_terminated, is_truncated, {}
 
     def reset(self, seed=None, options=None):
-        self.img_idxs = torch.randperm(len(self.dataset))[:self.batch_size]
-        subset = Subset(self.dataset, self.img_idxs)
-        self.orig = self.cur_state = torch.stack([img for img, _ in subset])
+        # self.img_idxs = torch.randperm(len(self.dataset))[:self.batch_size]
+        self.img_idxs = torch.randint(0, len(self.dataset), (1, ))
+        # subset = Subset(self.dataset, self.img_idxs)
+        # self.orig = self.cur_state = torch.stack([img for img, _ in subset])
+        self.orig, _ = self.dataset[self.img_idxs]
+        self.cur_state = self.init_dist.rsample().reshape(*self.orig.shape)
         self.states = [self.cur_state]
-        self.time = 0
+        self.time = torch.zeros(1, dtype=int)
         return {"obs":self.cur_state, "time": self.time}, {}
 
     def render(self, *args, **kwargs):

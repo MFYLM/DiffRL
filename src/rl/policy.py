@@ -26,13 +26,13 @@ class MlpExtractor(nn.Module):
         self.policy_net = MLP(net_arch, emb_size=feature_dim)
         # self.value_net = MLP(net_arch, output_size=1, emb_size=feature_dim) ## TODO: figure this out # nn.Sequential(*value_net).to(device)
         self.value_net = nn.Sequential(*[
-            nn.Linear(net_arch[0], 64),
+            nn.Linear(1025, 64),
             nn.Linear(64, 128), nn.GELU(),
             nn.Linear(128, 128), nn.GELU(),
-            nn.Linear(128, 64), nn.GELU(),
-            nn.Linear(64, 32), nn.GELU(),
-            nn.Linear(32, 16), nn.GELU(),
-            nn.Linear(16, 1), nn.GELU(),
+            # nn.Linear(128, 64), nn.GELU(),
+            # nn.Linear(64, 32), nn.GELU(),
+            # nn.Linear(32, 16), nn.GELU(),
+            # nn.Linear(16, 1), nn.GELU(),
         ])
         self.latent_dim_pi = net_arch[-1]
         self.latent_dim_vf = net_arch[-1]
@@ -42,7 +42,6 @@ class MlpExtractor(nn.Module):
         :return: latent_policy, latent_value of the specified network.
             If all layers are shared, then ``latent_policy == latent_value``
         """
-        print(f"features: {features}")
         return self.forward_actor(features), self.forward_critic(features)
 
     def forward_actor(self, features: torch.Tensor) -> torch.Tensor:

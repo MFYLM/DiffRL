@@ -26,8 +26,10 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
             pickle.dump(self.data, f)
 
     def __getitem__(self, index):
-        print(f"one datapoint: {self.data[index]}")
-        return self.data[index]
+        return torch.tensor(self.data[index]), 0
+    
+    def __len__(self):
+        return len(self.data)
 
 
 def ode_solve(z0, t0, t1, f):

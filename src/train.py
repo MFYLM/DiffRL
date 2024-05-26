@@ -16,34 +16,30 @@ def train(args):
     model = PPO(
         policy=MLPPolicy,
         env=env,
-        policy_kwargs={"net_arch":[64, 128]},
+        policy_kwargs={"net_arch":[128, 128, 128]},
     )
 
-    model.learn(total_timesteps=100)
+    model.learn(total_timesteps=10000)
 
-
-
-def env_test(args):
-    env = FlowDiffusionEnv(
-        **args.env_kwargs
-    )
+    imgs = []
 
     obs, _ = env.reset()
-    for _ in range(100):
-        action = env.action_space.sample()
-
-        plt.figure()
-        plt.imshow(obs[0].squeeze())
-        plt.show(block=True)
-        time.sleep(3)
+    while True:
+        action, _ = model.predict(obs)
 
         obs, reward, done, trunc, info = env.step(action)
+
+        imgs.append(obs["obs"].reshape(32, 32))
 
         if done or trunc:
             break
 
-
-
+    import numpy as np
+    table = np.arange(1000).reshape(100, 10) + 1
+    print(imgs[0].shape)
+    for img in imgs[-10:]:
+        plt.imshow(img)
+        plt.show(block=True)
 
 def main():
     args = parse_args()
