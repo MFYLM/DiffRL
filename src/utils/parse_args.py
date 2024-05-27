@@ -4,7 +4,7 @@ def construct_env_kwargs(args):
     env_kwargs = {
         "max_time_step": args.max_time_steps,
         # "batch_size": args.batch_size,
-        "action_range": (-1, 1),
+        "action_range": (-0.1, 0.1),
         # "obs_horizon": args.obs_horizon,
     }
     if args.dataset == "MNIST":

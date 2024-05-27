@@ -56,12 +56,12 @@ class MLP(nn.Module):
         super().__init__()
 
         self.time_mlp = PositionalEmbedding(emb_size - 1)
-        self.input_mlp1 = PositionalEmbedding(emb_size - 1, scale=25.0)
-        self.input_mlp2 = PositionalEmbedding(emb_size - 1, scale=25.0)
+        # self.input_mlp1 = PositionalEmbedding(emb_size - 1, scale=25.0)
+        # self.input_mlp2 = PositionalEmbedding(emb_size - 1, scale=25.0)
 
         # size of embeddings with input data
-        concat_size = len(self.time_mlp.layer) + \
-            len(self.input_mlp1.layer) + len(self.input_mlp2.layer)
+        concat_size = len(self.time_mlp.layer) * 2 # + \
+            # len(self.input_mlp1.layer) + len(self.input_mlp2.layer)
         
         # First layer of neurons
         layers = [nn.Linear(concat_size, net_arch[0]), nn.GELU()]
@@ -75,11 +75,12 @@ class MLP(nn.Module):
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x):
-        x,t = x[:, :-1], x[:, -1]
-        x1_emb = self.input_mlp1(x[:, 0])
-        x2_emb = self.input_mlp2(x[:, 1])
+        x, t = x[:, :-1], x[:, -1]
+        # x1_emb = self.input_mlp1(x[:, 0])
+        # x2_emb = self.input_mlp2(x[:, 1])
         t_emb = self.time_mlp(t)
-        x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
+        # x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
+        x = torch.cat((x, t_emb), dim=-1)
         if x.size(0) == 1:
             x = x.flatten()
         x = self.joint_mlp(x)

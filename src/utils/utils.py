@@ -11,10 +11,10 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
             self.load(data_path)
         else:
             self.data = []
+            img = generate_happy_face(num_samples=512)
+            if transform:
+                img = transform(img)
             for _ in range(size):
-                img = generate_happy_face(num_samples=512)
-                if transform:
-                    img = transform(img)
                 self.data.append(img)
     
     def load(self, data_path):
@@ -26,7 +26,7 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
             pickle.dump(self.data, f)
 
     def __getitem__(self, index):
-        return torch.tensor(self.data[index]), 0
+        return self.data[index], 0
     
     def __len__(self):
         return len(self.data)

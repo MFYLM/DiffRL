@@ -4,7 +4,9 @@ from rl import PPO, MLPPolicy
 from diffusion import FlowDiffusionEnv
 from utils import parse_args
 
-import time, matplotlib
+import time
+import matplotlib
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -17,28 +19,32 @@ def train(args):
         policy=MLPPolicy,
         env=env,
         policy_kwargs={"net_arch":[128, 128, 128]},
+        gamma=1
     )
 
     model.learn(total_timesteps=10000)
 
     imgs = []
+    rewards = []
 
     obs, _ = env.reset()
     while True:
         action, _ = model.predict(obs)
 
         obs, reward, done, trunc, info = env.step(action)
+        rewards.append(reward)
+        # print("done, trunc:", done.item(), trunc.item())
 
-        imgs.append(obs["obs"].reshape(32, 32))
+        imgs.append(obs["obs"].reshape(512, 2))
 
         if done or trunc:
             break
+    
 
-    import numpy as np
-    table = np.arange(1000).reshape(100, 10) + 1
-    print(imgs[0].shape)
+    plt.plot(np.arange(len(rewards)), rewards)
+    plt.show(block=True)
     for img in imgs[-10:]:
-        plt.imshow(img)
+        plt.scatter(img[:, 0], img[:, 1])
         plt.show(block=True)
 
 def main():

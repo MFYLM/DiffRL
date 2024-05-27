@@ -88,7 +88,7 @@ class FlowDiffusionEnv(gym.Env):
         # TODO: fix updating current state and maintaining states 
         self.cur_state = self.cur_state + action
         self.states.append(self.cur_state)
-        reward = self._calculate_reward(action)
+        reward = self._calculate_reward()
         self.time += 1
 
         return {"obs":self.cur_state, "time": self.time}, reward, is_terminated, is_truncated, {}
@@ -112,9 +112,9 @@ class FlowDiffusionEnv(gym.Env):
         pass
 
     @torch.no_grad()
-    def _calculate_reward(self, action: torch.Tensor):
-        true_direction = self.states[self.time + 1] - self.states[self.time]
-        return torch.norm(true_direction - action)
+    def _calculate_reward(self):
+        # true_direction = self.states[self.time + 1] - self.states[self.time]
+        return -torch.norm(self.cur_state - self.orig)
 
     def _is_terminated(self):
         return torch.norm(self.cur_state - self.orig) < 0.01
