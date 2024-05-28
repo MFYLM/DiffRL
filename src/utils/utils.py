@@ -2,11 +2,11 @@ import pickle
 
 import numpy as np
 import torch
-from torchvision.transforms.v2 import Transform
+# from torchvision.transforms.v2 import Transform
 
 
 class SmileyFaceDataset(torch.utils.data.Dataset):
-    def __init__(self, size: int = 100, transform: Transform=None, data_path: str=None):
+    def __init__(self, size: int = 100, transform=None, data_path: str=None):
         if data_path is not None:
             self.load(data_path)
         else:

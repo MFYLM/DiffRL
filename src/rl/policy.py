@@ -45,7 +45,8 @@ class MlpExtractor(nn.Module):
         return self.forward_actor(features), self.forward_critic(features)
 
     def forward_actor(self, features: torch.Tensor) -> torch.Tensor:
-        return self.policy_net(features)
+        output = self.policy_net(features)
+        return output
 
     def forward_critic(self, features: torch.Tensor) -> torch.Tensor:
         return self.value_net(features)
