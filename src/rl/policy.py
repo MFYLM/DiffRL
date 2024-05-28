@@ -1,14 +1,17 @@
 """This code is built based on ActorCriticPolicy implementation from stable_baseline3"""
 
-from utils import MLP
+from typing import Dict, List, Tuple, Type, Union
 
-from stable_baselines3.common.policies import ActorCriticPolicy, MultiInputActorCriticPolicy
-from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
-from stable_baselines3.common.utils import get_device, is_vectorized_observation, obs_as_tensor
 import torch
 import torch.nn as nn
+from stable_baselines3.common.policies import (ActorCriticPolicy,
+                                               MultiInputActorCriticPolicy)
+from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
+from stable_baselines3.common.utils import (get_device,
+                                            is_vectorized_observation,
+                                            obs_as_tensor)
+from utils import MLP
 
-from typing import Union, List, Dict, Type, Tuple
 
 class MlpExtractor(nn.Module):
     def __init__(
@@ -55,7 +58,7 @@ class MlpExtractor(nn.Module):
 class MLPPolicy(MultiInputActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         super(MLPPolicy, self).__init__(*args, **kwargs)
-    
+
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = MlpExtractor(
             self.features_dim,
@@ -72,4 +75,4 @@ class MLPPolicy(MultiInputActorCriticPolicy):
     #         lr_schedule(1) is the initial learning rate
     #     """
 
-    #     self.value_net = 
+    #     self.value_net =

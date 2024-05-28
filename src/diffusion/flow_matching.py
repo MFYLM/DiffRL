@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 import torch.nn as nn
 
@@ -52,7 +54,9 @@ class EmpiricalFlowMatching(FlowMatching):
         for i_step in range(n_steps):
             # perterb
             z = z + h * (self.forward_model(torch.concat([x0, x1], axis=1), t.squeeze()) + x1 - x0) + \
-                (h**2) * torch.rand_like(x0) * self.forward_noise_model(torch.concat([x0, x1], axis=1), t.squeeze())
+                (h**2) * torch.rand_like(x0) * \
+                self.forward_noise_model(
+                    torch.concat([x0, x1], axis=1), t.squeeze())
             # used to make z converge to x1
             if t.mean() > 0.7:
                 z = z * (1-t) + x1 * t
