@@ -3,6 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
+from zuko.utils import odeint
 
 class SinusoidalEmbedding(nn.Module):
     def __init__(self, size: int, scale: float = 1.0):
@@ -100,6 +101,46 @@ class ResnetBlock(nn.Module):
     def forward(self, x: torch.Tensor):
         return x + self.act(self.fc(x))
 
+"RL Agent"
+class ConditionalVectorField(nn.Module):
+    def __init__(self, in_dim: int, out_dim: int, h_dims: List[int], embed_dim: int) -> None:
+        super().__init__()
+
+        self.time_mlp = PositionalEmbedding(embed_dim - 1)
+        self.in_dim = in_dim
+        concat_size = len(self.time_mlp.layer) + in_dim * 2
+        ins = [concat_size] + h_dims
+        outs = h_dims + [out_dim]
+
+        self.layers = nn.ModuleList([
+            nn.Sequential(ResnetBlock(nn.Linear(in_d, out_d), nn.GELU())) for in_d, out_d in zip(ins, outs)
+        ])
+        self.top = nn.Sequential(nn.Linear(out_dim, out_dim))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x, condition, t = x[:, :self.in_dim], x[:, self.in_dim:-1], x[:, -1]
+        t = self.time_mlp(t)
+        x = torch.cat((x, condition, t), dim=-1)
+
+        for l in self.layers:
+            x = l(x)
+        return self.top(x)
+
+
+"The Marginal that is fixed during RL training"
+#@title ⏳ Summary: please run this cell which contains the ```OTFlowMatching``` class
+class OTFlowMatching:
+
+  def __init__(self, sig_min: float = 0.001) -> None:
+    super().__init__()
+    self.sig_min = sig_min
+    self.eps = 1e-5
+
+  def psi_t(self, x: torch.Tensor, x_1: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+    """ Conditional Flow
+    """
+    return (1 - (1 - self.sig_min) * t) * x + t * x_1
+
 
 class VectorField(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, h_dims: List[int], embed_dim: int) -> None:
@@ -125,27 +166,40 @@ class VectorField(nn.Module):
             x = l(x)
         return self.top(x)
 
+class CondVF(nn.Module):
+  def __init__(self, net: nn.Module, n_steps: int = 100) -> None:
+    super().__init__()
+    self.net = net
 
-class ConditionalVectorField(nn.Module):
-    def __init__(self, in_dim: int, out_dim: int, h_dims: List[int], embed_dim: int) -> None:
-        super().__init__()
+  def forward(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    return self.net(t, x)
 
-        self.time_mlp = PositionalEmbedding(embed_dim - 1)
-        self.in_dim = in_dim
-        concat_size = len(self.time_mlp.layer) + in_dim * 2
-        ins = [concat_size] + h_dims
-        outs = h_dims + [out_dim]
+  def wrapper(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+      t = t * torch.ones(len(x), device=x.device)
+      return self(t, x)
 
-        self.layers = nn.ModuleList([
-            nn.Sequential(ResnetBlock(nn.Linear(in_d, out_d), nn.GELU())) for in_d, out_d in zip(ins, outs)
-        ])
-        self.top = nn.Sequential(nn.Linear(out_dim, out_dim))
+  def decode_t0_t1(self, x_0, t0, t1):
+    return odeint(self.wrapper, x_0, t0, t1, self.parameters())
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x, condition, t = x[:, :self.in_dim], x[:, self.in_dim:-1], x[:, -1]
-        t = self.time_mlp(t)
-        x = torch.cat((x, condition, t), dim=-1)
+  def encode(self, x_1: torch.Tensor) -> torch.Tensor:
+    return odeint(self.wrapper, x_1, 1., 0., self.parameters())
 
-        for l in self.layers:
-            x = l(x)
-        return self.top(x)
+  def decode(self, x_0: torch.Tensor) -> torch.Tensor:
+    return odeint(self.wrapper, x_0, 0., 1., self.parameters())
+
+def create_flow_matching(device: torch.device):
+    net = VectorField(2, 2, [512]*5, 10).to(device)
+    v_t = CondVF(net)
+    return v_t
+
+def calculate_loss(self, v_t: nn.Module, x_1: torch.Tensor) -> torch.Tensor:
+    """ Compute loss
+    """
+    # t ~ Unif([0, 1])
+    t = (torch.rand(1, device=x_1.device) + torch.arange(len(x_1), device=x_1.device) / len(x_1)) % (1 - self.eps)
+    t = t[:, None].expand(x_1.shape)
+    # x ~ p_t(x_0)
+    x_0 = torch.randn_like(x_1)
+    v_psi = v_t(t[:,0], self.psi_t(x_0, x_1, t))
+    d_psi = x_1 - (1 - self.sig_min) * x_0
+    return torch.mean((v_psi - d_psi) ** 2)
