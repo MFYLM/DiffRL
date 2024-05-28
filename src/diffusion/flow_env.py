@@ -11,7 +11,7 @@ from gymnasium.utils import seeding
 from torch.utils.data import Subset
 from torchvision.datasets import CIFAR10, MNIST
 from torchvision.transforms import v2
-from utils import MLP, SmileyFaceDataset
+from utils import MLP, SmileyFaceDataset, create_flow_matching
 
 from .flow_matching import EmpiricalFlowMatching
 
@@ -26,6 +26,7 @@ class FlowDiffusionEnv(gym.Env):
         action_range: Tuple[float],
         action_shape: Tuple[float],
         max_time_step: int,
+        weights_path: str
         # batch_size=256
     ) -> None:
         super(FlowDiffusionEnv, self).__init__()
@@ -53,6 +54,11 @@ class FlowDiffusionEnv(gym.Env):
         # self.batch_size = batch_size
         self.time = 0
         self.max_time_step = max_time_step
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.marginal_model = create_flow_matching(self.device)
+        with open(weights_path, 'rb') as f:
+            self.marginal_model.load_state_dict(torch.load(f, map_location=self.device))
 
         # current images
         self.cur_state = torch.randn(*action_shape)
@@ -117,9 +123,12 @@ class FlowDiffusionEnv(gym.Env):
 
     @torch.no_grad()
     def _calculate_reward(self, action: torch.Tensor):
-        # true_direction = self.states[self.time + 1] - self.states[self.time]
-        true_direction = self.cur_state - self.orig
-        return torch.dot(true_direction.flatten(), torch.tensor(action).flatten())
+        current_time_step = torch.full_like(self.orig, self.time.item()/self.max_time_step)[:,:,0].to(self.device)
+        true_direction = self.marginal_model(current_time_step, self.cur_state).squeeze()
+        # return torch.dot(true_direction.flatten(), torch.tensor(action).flatten())
+        dist = -torch.norm(true_direction.flatten() - torch.tensor(action).flatten())
+        # print(dist)
+        return dist
 
     def _is_terminated(self):
         return torch.norm(self.cur_state - self.orig) < 0.01
