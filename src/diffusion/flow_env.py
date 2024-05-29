@@ -140,7 +140,8 @@ class FlowDiffusionEnv(gym.Env):
         #     print("done saving")
         #     input()
         self.marginal_states.append(updated_marginal_state)
-        dist = -torch.norm(self.marginal_states[-1].flatten() - self.states[-1].flatten())
+        dist = -torch.norm(true_direction.flatten() - action.flatten())
+        # dist = -torch.norm(self.marginal_states[-1].flatten() - self.states[-1].flatten())
         return dist
 
     def _is_terminated(self):
