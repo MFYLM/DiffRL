@@ -2,11 +2,12 @@ import pickle
 
 import numpy as np
 import torch
+
 # from torchvision.transforms.v2 import Transform
 
 
 class SmileyFaceDataset(torch.utils.data.Dataset):
-    def __init__(self, size: int = 100, transform=None, data_path: str=None):
+    def __init__(self, size: int = 100, transform=None, data_path: str = None):
         if data_path is not None:
             self.load(data_path)
         else:
@@ -16,7 +17,7 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
                 img = transform(img)
             for _ in range(size):
                 self.data.append(img)
-    
+
     def load(self, data_path):
         with open(data_path, "rb") as f:
             self.data = pickle.load(f)
@@ -27,7 +28,7 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         return self.data[index], 0
-    
+
     def __len__(self):
         return len(self.data)
 
