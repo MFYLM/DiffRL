@@ -7,6 +7,7 @@ import torch
 from diffusion import FlowDiffusionEnv
 from rl import PPO, MLPPolicy
 from utils import parse_args
+from stable_baselines3.common.policies import MultiInputActorCriticPolicy 
 
 
 def train(args):
@@ -15,13 +16,13 @@ def train(args):
     )
 
     model = PPO(
-        policy=MLPPolicy,
+        policy=MultiInputActorCriticPolicy,
         env=env,
         policy_kwargs={"net_arch": [128, 128, 128]},
         gamma=1
     )
 
-    model.learn(total_timesteps=10000)
+    model.learn(total_timesteps=1000000)
 
     imgs = []
     rewards = []

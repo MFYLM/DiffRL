@@ -61,6 +61,10 @@ class FlowDiffusionEnv(gym.Env):
         with open(weights_path, 'rb') as f:
             self.marginal_model.load_state_dict(torch.load(f, map_location=self.device))
         self.marginal_states = []
+        t0 = torch.zeros((512, 2))[:,0].to(self.device)
+        t1 = torch.ones((512, 2))[:,0].to(self.device)
+        self.h = (t1 - t0)/self.max_time_step
+        self.t = t0
 
         # current images
         self.cur_state = torch.randn(*action_shape)
@@ -113,31 +117,30 @@ class FlowDiffusionEnv(gym.Env):
         self.orig, _ = self.dataset[self.img_idxs]
         self.cur_state = self.init_dist.rsample().reshape(*self.orig.shape)
         self.states = [self.cur_state]
-        self.marginal_states = [self.cur_state]
+        self.marginal_states = [torch.randn((512, 2)).to(self.device)]
         self.time = torch.zeros(1, dtype=int)
         return {"obs": self.cur_state, "time": self.time}, {}
 
     def render(self, *args, **kwargs):
-        # pts = self.cur_state.reshape((512,2))
-        # plt.scatter(pts[:,0], pts[:,1]) 
-        # plt.draw()
-        # plt.pause(1e-4)
-        # plt.clf()
         pass
 
     def close(self):
-        # Don't really need to worry about this
         pass
 
     @torch.no_grad()
     def _calculate_reward(self, action: torch.Tensor):
-        current_time_step = torch.full_like(self.orig, self.time.item()/self.max_time_step)[:,:,0].to(self.device)
-        true_direction = self.marginal_model(current_time_step, self.cur_state).squeeze()
-        self.marginal_states.append(self.marginal_states[-1] + true_direction)
-        # self.marginal_states.append(true_direction)
-        # return torch.dot(true_direction.flatten(), torch.tensor(action).flatten())
-        # dist = -torch.norm(true_direction.flatten() - torch.tensor(action).flatten())
-        dist = -torch.norm(torch.stack(self.marginal_states).flatten() - torch.stack(self.states).flatten())
+        true_direction = self.h[:,None] * self.marginal_model(self.t, self.marginal_states[-1]).squeeze()
+        updated_marginal_state = self.marginal_states[-1] + true_direction
+        self.t = self.t + self.h
+        # copy = updated_marginal_state.clone().squeeze().detach().cpu().numpy()
+        # plt.scatter(copy[:,0], copy[:,1])
+        # plt.savefig(f"./all_imgs/{self.time.item()}.jpg")
+        # plt.close()
+        # if self.time.item() == 1000:
+        #     print("done saving")
+        #     input()
+        self.marginal_states.append(updated_marginal_state)
+        dist = -torch.norm(self.marginal_states[-1].flatten() - self.states[-1].flatten())
         return dist
 
     def _is_terminated(self):

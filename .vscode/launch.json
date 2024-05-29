@@ -8,5 +8,12 @@
             "program": "${workspaceFolder}/src/train.py",
             "console": "integratedTerminal"
         },
+        {
+            "name": "reinforce_train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/reinforce_train.py",
+            "console": "integratedTerminal"
+        },
     ]
 }

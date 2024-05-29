@@ -3,3 +3,5 @@ __pycache__/
 data/
 .vscode/launch.json
 weights/*.pt
+all_imgs/
+all_imgs.zip
