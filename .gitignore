@@ -5,3 +5,4 @@ data/
 src/rl/reinforce.pyweights/*.pt
 all_imgs/
 all_imgs.zip
+src/rl/reinforce.py
