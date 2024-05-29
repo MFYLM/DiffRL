@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.utils as utils
 from gymnasium import spaces
 from gymnasium.utils import seeding
+from matplotlib import pyplot as plt
 from torch.utils.data import Subset
 from torchvision.datasets import CIFAR10, MNIST
 from torchvision.transforms import v2
@@ -26,7 +27,7 @@ class FlowDiffusionEnv(gym.Env):
         action_range: Tuple[float],
         action_shape: Tuple[float],
         max_time_step: int,
-        weights_path: str
+        weights_path: str,
         # batch_size=256
     ) -> None:
         super(FlowDiffusionEnv, self).__init__()
@@ -59,6 +60,7 @@ class FlowDiffusionEnv(gym.Env):
         self.marginal_model = create_flow_matching(self.device)
         with open(weights_path, 'rb') as f:
             self.marginal_model.load_state_dict(torch.load(f, map_location=self.device))
+        self.marginal_states = []
 
         # current images
         self.cur_state = torch.randn(*action_shape)
@@ -95,9 +97,9 @@ class FlowDiffusionEnv(gym.Env):
         is_terminated = self._is_terminated()
         is_truncated = self._is_truncated()
 
-        # TODO: fix updating current state and maintaining states
         self.cur_state = self.cur_state + action
         self.states.append(self.cur_state)
+        # self.states.append(torch.tensor(action))
         reward = self._calculate_reward(action)
         self.time += 1
 
@@ -111,10 +113,16 @@ class FlowDiffusionEnv(gym.Env):
         self.orig, _ = self.dataset[self.img_idxs]
         self.cur_state = self.init_dist.rsample().reshape(*self.orig.shape)
         self.states = [self.cur_state]
+        self.marginal_states = [self.cur_state]
         self.time = torch.zeros(1, dtype=int)
         return {"obs": self.cur_state, "time": self.time}, {}
 
     def render(self, *args, **kwargs):
+        # pts = self.cur_state.reshape((512,2))
+        # plt.scatter(pts[:,0], pts[:,1]) 
+        # plt.draw()
+        # plt.pause(1e-4)
+        # plt.clf()
         pass
 
     def close(self):
@@ -125,9 +133,11 @@ class FlowDiffusionEnv(gym.Env):
     def _calculate_reward(self, action: torch.Tensor):
         current_time_step = torch.full_like(self.orig, self.time.item()/self.max_time_step)[:,:,0].to(self.device)
         true_direction = self.marginal_model(current_time_step, self.cur_state).squeeze()
+        self.marginal_states.append(self.marginal_states[-1] + true_direction)
+        # self.marginal_states.append(true_direction)
         # return torch.dot(true_direction.flatten(), torch.tensor(action).flatten())
-        dist = -torch.norm(true_direction.flatten() - torch.tensor(action).flatten())
-        # print(dist)
+        # dist = -torch.norm(true_direction.flatten() - torch.tensor(action).flatten())
+        dist = -torch.norm(torch.stack(self.marginal_states).flatten() - torch.stack(self.states).flatten())
         return dist
 
     def _is_terminated(self):
