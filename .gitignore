@@ -4,4 +4,6 @@ data/
 .vscode/launch.json
 weights/*.pt
 all_imgs/
+all_imgs_spiral/
 all_imgs.zip
+runs/*
