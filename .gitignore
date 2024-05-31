@@ -2,8 +2,9 @@
 __pycache__/
 data/
 .vscode/launch.json
-weights/*.pt
+src/rl/reinforce.pyweights/*.pt
 all_imgs/
 all_imgs_spiral/
 all_imgs.zip
+src/rl/reinforce.py
 runs/*
