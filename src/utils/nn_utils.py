@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from zuko.utils import odeint
+from typing import Union, Dict
 
 
 class SinusoidalEmbedding(nn.Module):
@@ -63,12 +64,10 @@ class MLP(nn.Module):
     ):
         super().__init__()
 
-        self.time_mlp = PositionalEmbedding(emb_size - 1)
-        # self.input_mlp1 = PositionalEmbedding(emb_size - 1, scale=25.0)
-        # self.input_mlp2 = PositionalEmbedding(emb_size - 1, scale=25.0)
+        self.time_mlp = PositionalEmbedding(emb_size)
 
         # size of embeddings with input data
-        concat_size = len(self.time_mlp.layer) * 2  # + \
+        concat_size = len(self.time_mlp.layer) + 2048 # + \
         # len(self.input_mlp1.layer) + len(self.input_mlp2.layer)
 
         # First layer of neurons
@@ -82,15 +81,15 @@ class MLP(nn.Module):
         layers.append(nn.Linear(net_arch[-1], output_size))
         self.joint_mlp = nn.Sequential(*layers)
 
-    def forward(self, x):
-        x, t = x[:, :-1], x[:, -1]
-        # x1_emb = self.input_mlp1(x[:, 0])
-        # x2_emb = self.input_mlp2(x[:, 1])
+    @torch.autocast(device_type="cpu", dtype=torch.float32)
+    def forward(self, x, t):
         t_emb = self.time_mlp(t)
-        # x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
         x = torch.cat((x, t_emb), dim=-1)
         if x.size(0) == 1:
             x = x.flatten()
+        print("joint mlp: ", list(list(self.joint_mlp.children())[0].parameters())[0].dtype)
+        print(f"x dtype: {x.dtype}")
+        # TODO: why does this network expect double
         x = self.joint_mlp(x)
         return x
 
@@ -103,8 +102,6 @@ class ReinforceMLP(nn.Module):
         super().__init__()
 
         self.time_mlp = PositionalEmbedding(emb_size - 1)
-        # self.input_mlp1 = PositionalEmbedding(emb_size - 1, scale=25.0)
-        # self.input_mlp2 = PositionalEmbedding(emb_size - 1, scale=25.0)
 
         # size of embeddings with input data
         concat_size = len(self.time_mlp.layer) * 2  # + \
@@ -122,10 +119,7 @@ class ReinforceMLP(nn.Module):
         self.joint_mlp = nn.Sequential(*layers)
 
     def forward(self, x, t):
-        # x1_emb = self.input_mlp1(x[:, 0])
-        # x2_emb = self.input_mlp2(x[:, 1])
         t_emb = self.time_mlp(t)
-        # x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
         x = torch.cat((x, t_emb), dim=-1)
         if x.size(0) == 1:
             x = x.flatten()
@@ -149,49 +143,24 @@ class ResnetBlock(nn.Module):
 
 class ConditionalVectorField(nn.Module):
     def __init__(
-        self, in_dim: int, out_dim: int, h_dims: List[int], embed_dim: int
+        self, 
+        step: float,
+        feature_dim: int,
+        net_arch: Union[List[int], Dict[str, List[int]]],
+        device: torch.device=None,
     ) -> None:
         super().__init__()
-
-        self.time_mlp = PositionalEmbedding(embed_dim - 1)
-        self.in_dim = in_dim
-        concat_size = len(self.time_mlp.layer) + in_dim * 2
-        ins = [concat_size] + h_dims
-        outs = h_dims + [out_dim]
-
-        self.layers = nn.ModuleList(
-            [
-                nn.Sequential(ResnetBlock(nn.Linear(in_d, out_d), nn.GELU()))
-                for in_d, out_d in zip(ins, outs)
-            ]
-        )
-        self.top = nn.Sequential(nn.Linear(out_dim, out_dim))
+        self.device = device
+        self.step = step
+        self.drift_net = MLP(net_arch, emb_size=feature_dim).to(self.device)
+        self.covariance_net = MLP(net_arch, emb_size=feature_dim).to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x, condition, t = x[:, : self.in_dim], x[:, self.in_dim : -1], x[:, -1]
-        t = self.time_mlp(t)
-        x = torch.cat((x, condition, t), dim=-1)
-
-        for l in self.layers:
-            x = l(x)
-        return self.top(x)
-
-
-"The Marginal that is fixed during RL training"
-
-
-# @title ⏳ Summary: please run this cell which contains the ```OTFlowMatching``` class
-class OTFlowMatching:
-    def __init__(self, sig_min: float = 0.001) -> None:
-        super().__init__()
-        self.sig_min = sig_min
-        self.eps = 1e-5
-
-    def psi_t(
-        self, x: torch.Tensor, x_1: torch.Tensor, t: torch.Tensor
-    ) -> torch.Tensor:
-        """Conditional Flow"""
-        return (1 - (1 - self.sig_min) * t) * x + t * x_1
+        x, t = x[:,:-1], x[:,-1]
+        drift = self.drift_net(x, t)
+        covariance = self.covariance_net(x, t)
+        print("self.step:", type(self.step))
+        return drift * self.step + covariance * (self.step ** 0.5)
 
 
 class VectorField(nn.Module):
@@ -222,82 +191,6 @@ class VectorField(nn.Module):
         for l in self.layers:
             x = l(x)
         return self.top(x)
-
-
-# @title ⏳ Summary: please run this cell which contains the ```Net``` class.
-class Net(nn.Module):
-    def __init__(
-        self, in_dim: int, out_dim: int, h_dims: List[int], n_frequencies: int
-    ) -> None:
-        super().__init__()
-
-        ins = [in_dim + 2 * n_frequencies] + h_dims
-        outs = h_dims + [out_dim]
-        self.n_frequencies = n_frequencies
-
-        self.layers = nn.ModuleList(
-            [
-                nn.Sequential(nn.Linear(in_d, out_d), nn.LeakyReLU())
-                for in_d, out_d in zip(ins, outs)
-            ]
-        )
-        self.top = nn.Sequential(nn.Linear(out_dim, out_dim))
-
-    def time_encoder(self, t: torch.Tensor) -> torch.Tensor:
-        freq = 2 * torch.arange(self.n_frequencies, device=t.device) * torch.pi
-        t = freq * t[..., None]
-        return torch.cat((t.cos(), t.sin()), dim=-1)
-
-    def forward(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        t = self.time_encoder(t)
-        x = torch.cat((x, t), dim=-1)
-
-        for l in self.layers:
-            x = l(x)
-        return self.top(x)
-
-
-class CondVF(nn.Module):
-    def __init__(self, net: nn.Module, n_steps: int = 100) -> None:
-        super().__init__()
-        self.net = net
-
-    def forward(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        return self.net(t, x)
-
-    def wrapper(self, t: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
-        t = t * torch.ones(len(x), device=x.device)
-        return self(t, x)
-
-    def decode_t0_t1(self, x_0, t0, t1):
-        return odeint(self.wrapper, x_0, t0, t1, self.parameters())
-
-    def encode(self, x_1: torch.Tensor) -> torch.Tensor:
-        return odeint(self.wrapper, x_1, 1.0, 0.0, self.parameters())
-
-    def decode(self, x_0: torch.Tensor) -> torch.Tensor:
-        return odeint(self.wrapper, x_0, 0.0, 1.0, self.parameters())
-
-
-def create_flow_matching(device: torch.device):
-    net = Net(2, 2, [512] * 5, 10).to(device)
-    v_t = CondVF(net)
-    return v_t
-
-
-def calculate_loss(self, v_t: nn.Module, x_1: torch.Tensor) -> torch.Tensor:
-    """Compute loss"""
-    # t ~ Unif([0, 1])
-    t = (
-        torch.rand(1, device=x_1.device)
-        + torch.arange(len(x_1), device=x_1.device) / len(x_1)
-    ) % (1 - self.eps)
-    t = t[:, None].expand(x_1.shape)
-    # x ~ p_t(x_0)
-    x_0 = torch.randn_like(x_1)
-    v_psi = v_t(t[:, 0], self.psi_t(x_0, x_1, t))
-    d_psi = x_1 - (1 - self.sig_min) * x_0
-    return torch.mean((v_psi - d_psi) ** 2)
 
 
 class ReinforcePolicy(nn.Module):

@@ -1,2 +1,2 @@
 from .ppo import PPO
-from .policy import MLPPolicy
+from .policy import MLPPolicy, EmpiricalFlowMatchingPolicy

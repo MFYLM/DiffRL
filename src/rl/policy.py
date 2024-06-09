@@ -10,6 +10,7 @@ from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from stable_baselines3.common.utils import (get_device,
                                             is_vectorized_observation,
                                             obs_as_tensor)
+from utils.nn_utils import ConditionalVectorField, Block
 from utils import MLP
 import torch.nn.functional as F
 
@@ -50,6 +51,7 @@ class MlpExtractor(nn.Module):
         return self.forward_actor(features), self.forward_critic(features)
 
     def forward_actor(self, features: torch.Tensor) -> torch.Tensor:
+        print("extractor features.shape: ", features.shape)
         output = self.policy_net(features)
         return output
 
@@ -63,7 +65,7 @@ class MLPPolicy(MultiInputActorCriticPolicy):
 
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = MlpExtractor(
-            self.features_dim,
+            self.feature_dim,
             net_arch=self.net_arch,
             activation_fn=self.activation_fn,
             device=self.device
@@ -84,8 +86,63 @@ class MLPPolicy(MultiInputActorCriticPolicy):
 
 
 
-class Policy(MultiInputActorCriticPolicy):
+class DriftCovarianceExtractor(nn.Module):
+    def __init__(
+        self,
+        feature_dim: int,
+        step: float,
+        net_arch: Union[List[int], Dict[str, List[int]]],
+        device: Union[torch.device, str] = "auto",
+    ) -> None:
+        super().__init__()
+        device = torch.device(device)
+        self.policy_net = ConditionalVectorField(step, feature_dim, net_arch, device).to(device)
+        self.value_net = nn.Sequential(*[
+            nn.Linear(2049, 1024), nn.GELU(),
+            nn.Linear(1024, 512), nn.GELU(),
+            nn.Linear(512, 256), nn.GELU(),
+            nn.Linear(256, 128), nn.GELU()
+            # nn.Linear(128, 64), nn.GELU(),
+            # nn.Linear(64, 32), nn.GELU(),
+            # nn.Linear(32, 16), nn.GELU(),
+            # nn.Linear(16, 1), nn.GELU(),
+        ])
+        self.latent_dim_pi = net_arch[-1]
+        self.latent_dim_vf = net_arch[-1]
 
+    def forward(self, features: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        :features: [x0, x1, t]
+
+        :return: latent_policy, latent_value of the specified network.
+            If all layers are shared, then ``latent_policy == latent_value``
+        """
+        features = torch.concat((features[:,:1024], features[:,2048:]), axis=1)
+        return self.forward_actor(features), self.forward_critic(features)
+
+    def forward_actor(self, features: torch.Tensor) -> torch.Tensor:
+        output = self.policy_net(features)
+        return output
+
+    def forward_critic(self, features: torch.Tensor) -> torch.Tensor:
+        return self.value_net(features)
+
+
+class EmpiricalFlowMatchingPolicy(MultiInputActorCriticPolicy):
+    def __init__(self, *args, **kwargs):
+        self.step = kwargs["step"]
+        self.feature_dim = kwargs["feature_dim"]
+        del kwargs["step"]
+        del kwargs["feature_dim"]
+        super(EmpiricalFlowMatchingPolicy, self).__init__(*args, **kwargs)
+    
+    def _build_mlp_extractor(self) -> None:
+        self.mlp_extractor = DriftCovarianceExtractor(
+            self.feature_dim,
+            self.step,
+            net_arch=self.net_arch,
+            device=self.device
+        )
 
     @torch.no_grad()
     def evaluate_actions(self, obs, actions, marginal_network):

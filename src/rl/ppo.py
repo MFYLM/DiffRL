@@ -19,7 +19,7 @@ from typing import NamedTuple
 
 from stable_baselines3.common.buffers import DictRolloutBuffer
 
-from .policy import MLPPolicy
+from .policy import MLPPolicy, EmpiricalFlowMatchingPolicy
 
 
 TensorDict = Dict[str, th.Tensor]
@@ -32,6 +32,7 @@ class DictRolloutBufferSamples(NamedTuple):
     advantages: th.Tensor
     returns: th.Tensor
     rewards: th.Tensor
+
 
 class TimeBuffer(DictRolloutBuffer):
     
@@ -75,8 +76,6 @@ class TimeBuffer(DictRolloutBuffer):
             returns=self.to_torch(self.returns[batch_inds].flatten()),
             rewards=self.to_torch(self.rewards[batch_inds].flatten())
         )
-
-    
 
 
 SelfPPO = TypeVar("SelfPPO", bound="PPO")
@@ -141,6 +140,7 @@ class PPO(OnPolicyAlgorithm):
         "MlpPolicy": MLPPolicy,
         "CnnPolicy": ActorCriticCnnPolicy,
         "MultiInputPolicy": MultiInputActorCriticPolicy,
+        "EmpiricalFlowMatchingPolicy": EmpiricalFlowMatchingPolicy,
     }
 
     def __init__(

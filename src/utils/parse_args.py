@@ -2,11 +2,11 @@ import argparse as ap
 
 def construct_env_kwargs(args):
     env_kwargs = {
-        "max_time_step": args.max_time_steps,
+        "max_time_steps": args.max_time_steps,
         # "batch_size": args.batch_size,
         "action_range": (-0.1, 0.1),
         # "obs_horizon": args.obs_horizon,
-        "weights_path": args.weights
+        # "weights_path": args.weights
     }
     if args.dataset == "MNIST":
         env_kwargs.update({
@@ -40,7 +40,7 @@ def parse_args():
     parser = ap.ArgumentParser(description="Train a FlowDiffusion model")
 
     parser.add_argument("-t", "--max_time_steps", type=int, default=1000)
-    parser.add_argument("-w", "--weights", type=str, default="./weights/smiley_face_weights.pt")
+    # parser.add_argument("-w", "--weights", type=str, default="./weights/smiley_face_weights.pt")
     # parser.add_argument("-bs", "--batch_size", type=int, default=32)
     # parser.add_argument("-oh", "--obs_horizon", type=int, default=1)
     parser.add_argument(

@@ -2,7 +2,6 @@ import pickle
 
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
 
 from sklearn.datasets import make_swiss_roll
 
@@ -12,11 +11,13 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
             self.load(data_path)
         else:
             self.data = []
-            img = generate_happy_face(num_samples=512)
+
+            prior = torch.randn((512, 2))
+            img = generate_happy_face(num_samples=512).squeeze()
             if transform:
                 img = transform(img)
             for _ in range(size):
-                self.data.append(img)
+                self.data.append((prior, img))
 
     def load(self, data_path):
         with open(data_path, "rb") as f:
@@ -27,7 +28,7 @@ class SmileyFaceDataset(torch.utils.data.Dataset):
             pickle.dump(self.data, f)
 
     def __getitem__(self, index):
-        return self.data[index], 0
+        return self.data[index]
 
     def __len__(self):
         return len(self.data)
