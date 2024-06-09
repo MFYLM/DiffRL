@@ -2,9 +2,9 @@ import pickle
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
 
-# from torchvision.transforms.v2 import Transform
-
+from sklearn.datasets import make_swiss_roll
 
 class SmileyFaceDataset(torch.utils.data.Dataset):
     def __init__(self, size: int = 100, transform=None, data_path: str = None):
@@ -48,6 +48,33 @@ def ode_solve(z0, t0, t1, f):
         t = t + h
 
     return zs
+
+class SpiralDataset(torch.utils.data.Dataset):
+    def __init__(self, size: int = 100, transform=None, data_path: str = None):
+        if data_path is not None:
+            self.load(data_path)
+        else:
+            self.data = []
+            data, _ = make_swiss_roll(n_samples=512, noise=0.25)
+            img = data[:,[0,2]]/10.0
+            if transform:
+                img = transform(img)
+            for _ in range(size):
+                self.data.append(img)
+
+    def load(self, data_path):
+        with open(data_path, "rb") as f:
+            self.data = pickle.load(f)
+
+    def save(self, data_path):
+        with open(data_path, "wb") as f:
+            pickle.dump(self.data, f)
+
+    def __getitem__(self, index):
+        return self.data[index], 0
+
+    def __len__(self):
+        return len(self.data)
 
 
 def generate_mixture_gaussians(num_samples=32, centers=6, spread=.5, radius=5.0):

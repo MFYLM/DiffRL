@@ -22,13 +22,13 @@ def construct_env_kwargs(args):
             "action_shape": (3, 32, 32), # (args.batch_size, 3, 32, 32),
             "obs_range": (0, 1),
         })
-    elif args.dataset == "smiley_face":
+    elif args.dataset == "smiley_face" or args.dataset == "spiral":
         # only for points (512, 2)
         env_kwargs.update({
-            "dataset": "smiley_face",
+            "dataset": args.dataset,
             "obs_shape": (512, 2), # (args.obs_horizon, args.batch_size, 512, 2),
             "action_shape": (512, 2), # (args.batch_size, 2),
-            "obs_range": (0, 5),
+            "obs_range": (-2, 2),
         })
     else:
         raise NotImplementedError(f"Dataset {args.dataset} not implemented")
@@ -44,7 +44,7 @@ def parse_args():
     # parser.add_argument("-bs", "--batch_size", type=int, default=32)
     # parser.add_argument("-oh", "--obs_horizon", type=int, default=1)
     parser.add_argument(
-        "-d", "--dataset", type=str, choices=["MNIST", "smiley_face", "CIFAR10"], default="smiley_face"
+        "-d", "--dataset", type=str, choices=["MNIST", "smiley_face", "CIFAR10", "spiral"], default="smiley_face"
     )
 
     args = parser.parse_args()

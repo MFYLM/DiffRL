@@ -6,3 +6,4 @@ scipy
 pytorch-fid
 zuko
 torchdiffeq
+scikit-learn

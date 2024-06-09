@@ -8,3 +8,5 @@ all_imgs_spiral/
 all_imgs.zip
 src/rl/reinforce.py
 runs/*
+imgs/
+weights/
