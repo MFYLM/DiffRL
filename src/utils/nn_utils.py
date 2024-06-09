@@ -334,3 +334,5 @@ class ReinforcePolicy(nn.Module):
         action = normal_dist.sample((512, 2))
         lp = normal_dist.log_prob(action)
         return action, lp
+
+

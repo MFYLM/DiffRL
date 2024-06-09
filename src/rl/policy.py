@@ -11,6 +11,7 @@ from stable_baselines3.common.utils import (get_device,
                                             is_vectorized_observation,
                                             obs_as_tensor)
 from utils import MLP
+import torch.nn.functional as F
 
 
 class MlpExtractor(nn.Module):
@@ -68,6 +69,9 @@ class MLPPolicy(MultiInputActorCriticPolicy):
             device=self.device
         )
 
+    def evaluate_actions(self, obs: torch.Tensor | Dict[str, torch.Tensor], actions: torch.Tensor) -> Tuple[torch.Tensor | None]:
+        return super().evaluate_actions(obs, actions)
+
     # def _build(self, lr_schedule: Schedule) -> None:
     #     """
     #     Create the networks and the optimizer.
@@ -77,3 +81,44 @@ class MLPPolicy(MultiInputActorCriticPolicy):
     #     """
 
     #     self.value_net =
+
+
+
+class Policy(MultiInputActorCriticPolicy):
+
+
+    @torch.no_grad()
+    def evaluate_actions(self, obs, actions, marginal_network):
+        """
+        Evaluate actions according to the current policy,
+        given the observations.
+
+        :param obs: Observation
+        :param actions: Actions
+        :return: estimated value, log likelihood of taking those actions
+            and entropy of the action distribution.
+        """
+        # Preprocess the observation if needed
+        features = self.extract_features(obs)
+        if self.share_features_extractor:
+            latent_pi, latent_vf = self.mlp_extractor(features)
+        else:
+            pi_features, vf_features = features
+            latent_pi = self.mlp_extractor.forward_actor(pi_features)
+            latent_vf = self.mlp_extractor.forward_critic(vf_features)
+        distribution = self._get_action_dist_from_latent(latent_pi)
+        log_prob = distribution.log_prob(actions)
+        values = self.value_net(latent_vf)
+        entropy = distribution.entropy()
+
+        observation, t = obs["obs"], obs["time"]
+        # NOTE: 
+        # 1. time embedding shape
+        # 2. potentially memory issues since all buffers are on GPU
+        output = marginal_network(
+            observation, 
+            t.reshape(-1, 1)
+        )
+        rewards = F.mse_loss(output, actions)
+        
+        return values, log_prob, entropy, rewards

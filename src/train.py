@@ -1,23 +1,27 @@
-import time
-
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torch import optim
+from torch.nn import functional as F
 from diffusion import FlowDiffusionEnv
 from rl import PPO, MLPPolicy
-from utils import parse_args
+from utils import parse_args, MLP
 from stable_baselines3.common.policies import MultiInputActorCriticPolicy 
 
 
 def train(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     env = FlowDiffusionEnv(
         **args.env_kwargs
-    )
+    )   
+    marginal_network = MLP().to(device)
+    marginal_optimizer = optim.Adam(marginal_network.parameters())
 
     model = PPO(
         policy=MultiInputActorCriticPolicy,
         env=env,
+        marginal_network=marginal_network,
+        marginal_optimizer=marginal_optimizer,
         policy_kwargs={"net_arch": [128, 128, 128]},
         gamma=1
     )
