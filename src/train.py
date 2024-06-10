@@ -12,10 +12,11 @@ from stable_baselines3.common.policies import MultiInputActorCriticPolicy
 
 def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    marginal_network = MLP().to(device)
+    marginal_network = MLP(input_size=1024).to(device)
     marginal_optimizer = optim.Adam(marginal_network.parameters())
     env = FlowDiffusionEnv(
         marginal_network,
+        marginal_optimizer,
         **args.env_kwargs
     )
 
@@ -24,7 +25,7 @@ def train(args):
         env=env,
         marginal_network=marginal_network,
         marginal_optimizer=marginal_optimizer,
-        policy_kwargs={"net_arch": [128, 128, 128], "step": 1.0 / args.env_kwargs["max_time_steps"], "feature_dim": 128},
+        policy_kwargs={"input_size": 2048, "net_arch": [128, 128, 128], "step": 1.0 / args.env_kwargs["max_time_steps"], "feature_dim": 128},
         gamma=1
     )
 

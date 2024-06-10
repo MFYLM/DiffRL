@@ -60,14 +60,14 @@ class Block(nn.Module):
 class MLP(nn.Module):
     # output_size was default 2
     def __init__(
-        self, net_arch=[128, 128, 128], output_size: int = 128, emb_size: int = 128
+        self, input_size: int, net_arch=[128, 128, 128], output_size: int = 128, emb_size: int = 128
     ):
         super().__init__()
 
         self.time_mlp = PositionalEmbedding(emb_size)
 
         # size of embeddings with input data
-        concat_size = len(self.time_mlp.layer) + 2048 # + \
+        concat_size = len(self.time_mlp.layer) + input_size # + \
         # len(self.input_mlp1.layer) + len(self.input_mlp2.layer)
 
         # First layer of neurons
@@ -144,6 +144,7 @@ class ResnetBlock(nn.Module):
 class ConditionalVectorField(nn.Module):
     def __init__(
         self, 
+        input_size: int,
         step: float,
         feature_dim: int,
         net_arch: Union[List[int], Dict[str, List[int]]],
@@ -152,8 +153,8 @@ class ConditionalVectorField(nn.Module):
         super().__init__()
         self.device = device
         self.step = step
-        self.drift_net = MLP(net_arch, emb_size=feature_dim).to(self.device)
-        self.covariance_net = MLP(net_arch, emb_size=feature_dim).to(self.device)
+        self.drift_net = MLP(input_size, net_arch, emb_size=feature_dim).to(self.device)
+        self.covariance_net = MLP(input_size, emb_size=feature_dim).to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x, t = x[:,:-1], x[:,-1]

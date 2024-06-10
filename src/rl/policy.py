@@ -89,6 +89,7 @@ class MLPPolicy(MultiInputActorCriticPolicy):
 class DriftCovarianceExtractor(nn.Module):
     def __init__(
         self,
+        input_size: int,
         feature_dim: int,
         step: float,
         net_arch: Union[List[int], Dict[str, List[int]]],
@@ -96,7 +97,7 @@ class DriftCovarianceExtractor(nn.Module):
     ) -> None:
         super().__init__()
         device = torch.device(device)
-        self.policy_net = ConditionalVectorField(step, feature_dim, net_arch, device).to(device)
+        self.policy_net = ConditionalVectorField(input_size, step, feature_dim, net_arch, device).to(device)
         self.value_net = nn.Sequential(*[
             nn.Linear(2049, 1024), nn.GELU(),
             nn.Linear(1024, 512), nn.GELU(),
@@ -132,12 +133,15 @@ class EmpiricalFlowMatchingPolicy(MultiInputActorCriticPolicy):
     def __init__(self, *args, **kwargs):
         self.step = kwargs["step"]
         self.feature_dim = kwargs["feature_dim"]
+        self.input_size = kwargs["input_size"]
         del kwargs["step"]
         del kwargs["feature_dim"]
+        del kwargs["input_size"]
         super(EmpiricalFlowMatchingPolicy, self).__init__(*args, **kwargs)
     
     def _build_mlp_extractor(self) -> None:
         self.mlp_extractor = DriftCovarianceExtractor(
+            self.input_size,
             self.feature_dim,
             self.step,
             net_arch=self.net_arch,
